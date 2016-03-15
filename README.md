@@ -81,4 +81,113 @@ void run()
 缺点：实现略微复杂
 
 # 具体代码
-> 代码明天再贴出
+1 **匿名函数解决方案**
+
+```C++
+#pragma once
+#include <string>
+#include <iostream>
+using namespace std;
+#include "Poco/Thread.h"
+#include "Poco/Mutex.h"
+#include "Poco/AutoPtr.h"
+#include "Poco/RefCountedObject.h"
+#include "Poco/Runnable.h"
+using namespace Poco;
+
+Mutex cout_lock;   // multi-thread safe lock 
+
+void Test(int t_id)
+{
+	int counts = 100;
+	while (counts-- > 0)
+	{
+		{
+			Thread::sleep(10);
+			Mutex::ScopedLock i_lock(cout_lock);
+			cout << "thread " << t_id << " is running " << endl;
+		}
+	}
+}
+
+// solution 1 work, but when setup thread would cost too much time 
+// not fit for the instant situation , like socket communication 
+void Solution_lambda()
+{
+	for (int i = 0; i < 10; i++)
+	{
+		Thread i_thread;
+		i_thread.startFunc([&]{
+			int i_id = i;
+			Test(i);
+		});
+		Thread::sleep(1);    // protect thread to be not destroyed
+	}
+	system("pause");
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+    Solution_lambda();
+	return 0;
+}
+
+```
+
+
+```c++
+class AbstractListener  // 数据接收端口
+{
+public:
+	virtual void onRecieve(string t_data)=0;
+	virtual void onSend() = 0;
+	virtual void onClose() = 0; 
+};
+
+class SocketAsynic: public Runnable
+{
+public:
+	SocketAsynic(AbstractListener * tptr_listener){
+
+		if (tptr_listener == nullptr)
+		{
+			abort();
+		}
+		_ptr_listener = tptr_listener;
+		_thread_manager.addCapacity(1000);
+	};
+	void start()   // main thread 
+	{
+		for (int i = 0; i < 100; i++)
+		{
+			string i_data = format("thread id : %d ", i);
+			Mutex::ScopedLock i_lock(_queque_lock);
+			_queque.push((i_data));		// push data into 
+			_thread_manager.start(*this);   // throw heavey task to do 
+		}
+	}
+	void Send(string t_data){};
+protected:
+	virtual void run() final{
+		string i_data;
+		{
+			Mutex::ScopedLock i_lock(_queque_lock);
+			if (_queque.empty())
+			{
+				return;			// not data to deal
+			}
+			i_data = _queque.front();
+			_queque.pop();
+		}
+		_ptr_listener->onRecieve(i_data);
+	};
+private:
+	ThreadPool _thread_manager;
+	Mutex	   _print_lock;
+	Mutex	   _queque_lock;
+	queue<string> _queque;
+	AbstractListener *_ptr_listener;
+
+};
+
+```
