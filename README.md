@@ -134,6 +134,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 ```
 
+-----------------------
+2 socket同步改异步的设计方案
 
 ```c++
 class AbstractListener  // 数据接收端口
@@ -185,9 +187,8 @@ private:
 	ThreadPool _thread_manager;
 	Mutex	   _print_lock;
 	Mutex	   _queque_lock;
-	queue<string> _queque;
+	queue<string> _queque;      // 使用队列传递数据
 	AbstractListener *_ptr_listener;
-
 };
 
 ```
